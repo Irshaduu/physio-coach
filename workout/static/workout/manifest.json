@@ -1,0 +1,17 @@
+{
+  "name": "Therapist — Physio Coach",
+  "short_name": "Therapist",
+  "description": "Your hands-free physiotherapy workout coach.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a1219",
+  "theme_color": "#00e5a0",
+  "icons": [
+    {
+      "src": "/static/workout/images/Icon-new.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

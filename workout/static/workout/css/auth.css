@@ -1,0 +1,175 @@
+/* ============================================================
+   Therapist — Authentication Stylesheet
+   ============================================================ */
+
+:root {
+    --bg-dark:         #0d1117;
+    --bg-card:         #161c27;
+    --text-primary:    #f0f4fb;
+    --text-secondary:  #8595ad;
+    --text-muted:      #4a5c70;
+    --teal-300:        #38e8a6;
+    --teal-400:        #00e5a0;
+    --teal-500:        #00cc8e;
+    --teal-600:        #00b37c;
+    --accent-danger:   #f0485e;
+    --radius-sm:       8px;
+    --radius-md:       12px;
+    --radius-lg:       20px;
+    --transition-fast: 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.auth-app {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 400px;
+    background: var(--bg-card);
+    border-radius: var(--radius-lg);
+    padding: 32px 24px;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+    text-align: center;
+}
+
+.auth-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-md);
+    background: rgba(15, 196, 142, 0.1);
+    color: var(--teal-400);
+    font-size: 2rem;
+    margin-bottom: 16px;
+}
+
+.auth-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.form-group label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: none; /* Hide labels, rely on placeholders for clean look */
+}
+
+.form-input, 
+.auth-form input[type="text"],
+.auth-form input[type="email"],
+.auth-form input[type="password"] {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95rem;
+    transition: all var(--transition-fast);
+}
+
+.form-input:focus,
+.auth-form input[type="text"]:focus,
+.auth-form input[type="email"]:focus,
+.auth-form input[type="password"]:focus {
+    outline: none;
+    border-color: var(--teal-400);
+    box-shadow: 0 0 0 3px rgba(15, 196, 142, 0.15);
+}
+
+.form-error {
+    color: var(--accent-danger);
+    font-size: 0.8rem;
+    margin-top: 4px;
+}
+
+.errorlist {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 16px 0;
+    color: var(--accent-danger);
+    font-size: 0.85rem;
+    background: rgba(244, 63, 94, 0.1);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    text-align: left;
+}
+
+.auth-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--teal-500), var(--teal-600));
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    margin-top: 8px;
+    box-shadow: 0 4px 12px rgba(15, 196, 142, 0.3);
+}
+
+.auth-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 196, 142, 0.4);
+    filter: brightness(1.1);
+}
+
+.auth-footer {
+    margin-top: 24px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.auth-link {
+    color: var(--teal-400);
+    text-decoration: none;
+    font-weight: 700;
+    margin-left: 4px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(15, 196, 142, 0.08);
+    transition: all var(--transition-fast);
+}
+
+.auth-link:hover {
+    background: var(--teal-400);
+    color: var(--bg-dark);
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(15, 196, 142, 0.2);
+}

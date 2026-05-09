@@ -1,0 +1,491 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Therapist — Progress Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a1219; --bg-surface: #111c27; --bg-elevated: #162130;
+    --border: rgba(255,255,255,0.07);
+    --green: #00e5a0; --green-dim: rgba(0,229,160,0.12);
+    --yellow: #f5c842; --red: #ff5757; --blue: #4da6ff;
+    --text-1: #f0f4f8; --text-2: #8fa3b8; --text-3: #4a6278;
+    --font: 'Inter', sans-serif;
+    --r: 14px; --r-sm: 8px; --r-full: 999px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text-1); font-family: var(--font); }
+
+  .page { max-width: 480px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; padding: 0 0 32px; }
+
+  /* Topbar */
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 16px 20px 12px; flex-shrink: 0; }
+  .back-btn { display: flex; align-items: center; justify-content: center; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--r-full); padding: 7px; color: var(--text-2); cursor: pointer; text-decoration: none; transition: all .2s; flex-shrink: 0; }
+  .back-btn:hover { color: var(--text-1); background: var(--bg-elevated); }
+  .topbar__title { font-size: 1rem; font-weight: 800; letter-spacing: -0.03em; color: var(--text-1); }
+
+  /* Stats Row */
+  .stats-row { display: flex; gap: 10px; padding: 0 20px 20px; }
+  .stat-card { flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; }
+  .stat-card__val { font-size: 1.4rem; font-weight: 900; letter-spacing: -0.04em; color: var(--green); }
+  .stat-card__label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-3); margin-top: 2px; }
+
+  /* Chart Section */
+  .chart-section { flex: 1; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; }
+  .chart-header { display: flex; align-items: center; justify-content: space-between; }
+  .chart-title { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-3); }
+  .chart-legend { display: flex; align-items: center; gap: 6px; font-size: 0.68rem; color: var(--text-3); }
+  .chart-legend__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+
+  .chart-wrap { position: relative; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; height: 280px; }
+  #chart { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+  #chart:active { cursor: grabbing; }
+
+  /* Tooltip */
+  .tooltip { position: absolute; background: var(--bg-elevated); border: 1px solid rgba(0,229,160,0.3); border-radius: var(--r-sm); padding: 8px 12px; pointer-events: none; opacity: 0; transition: opacity .15s; transform: translateX(-50%); white-space: nowrap; }
+  .tooltip__date { font-size: 0.68rem; color: var(--text-3); font-weight: 600; }
+  .tooltip__score { font-size: 1rem; font-weight: 900; color: var(--green); letter-spacing: -0.03em; }
+  .tooltip__sessions { font-size: 0.65rem; color: var(--text-3); }
+  .tooltip--visible { opacity: 1; }
+
+  /* Scroll hint */
+  .scroll-hint { text-align: center; font-size: 0.68rem; color: var(--text-3); padding-top: 4px; }
+
+  /* Empty state */
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 12px; text-align: center; padding: 40px 20px; }
+  .empty-state__icon { font-size: 2.5rem; }
+  .empty-state__title { font-size: 1rem; font-weight: 800; color: var(--text-1); }
+  .empty-state__desc { font-size: 0.82rem; color: var(--text-3); line-height: 1.6; max-width: 240px; }
+
+  /* Loader */
+  .loader { display: flex; align-items: center; justify-content: center; flex: 1; }
+  .loader__spinner { width: 28px; height: 28px; border: 3px solid var(--bg-elevated); border-top-color: var(--green); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Ambient glow */
+  body::before { content:''; position:fixed; top:-120px; left:50%; transform:translateX(-50%); width:600px; height:300px; background:radial-gradient(ellipse, rgba(0,229,160,0.07) 0%, transparent 70%); pointer-events:none; z-index:0; }
+  .page { position: relative; z-index: 1; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <a href="javascript:window.close()" class="back-btn" title="Close">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </a>
+    <span class="topbar__title" id="page-title">Progress Report</span>
+  </header>
+
+  <!-- Stats Row (populated by JS) -->
+  <div class="stats-row" id="stats-row" style="display:none;">
+    <div class="stat-card">
+      <div class="stat-card__val" id="stat-days">—</div>
+      <div class="stat-card__label">Active Days</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__val" id="stat-avg">—</div>
+      <div class="stat-card__label">Avg Score</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card__val" id="stat-best">—</div>
+      <div class="stat-card__label">Good Days</div>
+    </div>
+  </div>
+
+  <!-- Loader -->
+  <div class="loader" id="loader">
+    <div class="loader__spinner"></div>
+  </div>
+
+  <!-- Chart Section -->
+  <div class="chart-section" id="chart-section" style="display:none;">
+    <div class="chart-header">
+      <span class="chart-title">Daily Performance</span>
+      <span class="chart-legend"><span class="chart-legend__dot"></span>Score %</span>
+    </div>
+    <div class="chart-wrap" id="chart-wrap">
+      <canvas id="chart"></canvas>
+      <div class="tooltip" id="tooltip">
+        <div class="tooltip__date" id="tt-date"></div>
+        <div class="tooltip__score" id="tt-score"></div>
+        <div class="tooltip__sessions" id="tt-sessions"></div>
+      </div>
+    </div>
+    <div class="scroll-hint" id="scroll-hint">← Drag to scroll through history →</div>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state" id="empty-state" style="display:none;">
+    <div class="empty-state__icon">📊</div>
+    <div class="empty-state__title">No Data Yet</div>
+    <div class="empty-state__desc">Complete your first workout session to see your progress chart here.</div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const GREEN       = '#00e5a0';
+  const GREEN_DIM   = 'rgba(0,229,160,0.15)';
+  const GREEN_FADE  = 'rgba(0,229,160,0)';
+  const GRID_COL    = 'rgba(255,255,255,0.05)';
+  const AXIS_COL    = 'rgba(255,255,255,0.12)';
+  const TEXT_COL    = 'rgba(143,163,184,0.9)';
+
+  const PAD_LEFT    = 42;   // Y-axis labels width
+  const PAD_RIGHT   = 16;
+  const PAD_TOP     = 20;
+  const PAD_BOTTOM  = 36;   // X-axis labels height
+  const COL_W       = 52;   // pixels per day column
+
+  let days = [];
+  let scrollX = 0;           // pixels scrolled from the right edge
+  let isDragging = false;
+  let dragStartX = 0;
+  let dragStartScroll = 0;
+  let activeIdx = -1;
+  let animProgress = 0;
+  let animFrame = null;
+
+  const canvas  = document.getElementById('chart');
+  const tooltip = document.getElementById('tooltip');
+  const wrap    = document.getElementById('chart-wrap');
+  const ttDate  = document.getElementById('tt-date');
+  const ttScore = document.getElementById('tt-score');
+  const ttSess  = document.getElementById('tt-sessions');
+
+  // ── Fetch data ─────────────────────────────────────────
+  fetch('/api/performance/')
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('loader').style.display = 'none';
+      days = data.days || [];
+
+      if (days.length === 0) {
+        // Show the graph even with no data
+        document.getElementById('stats-row').style.display = 'flex';
+        document.getElementById('chart-section').style.display = 'flex';
+        document.getElementById('stat-days').textContent  = '0';
+        document.getElementById('stat-avg').textContent   = '0%';
+        document.getElementById('stat-best').textContent  = '0%';
+        initCanvas();
+        animateIn();
+        return;
+      }
+
+      // Page title
+      if (data.display_name) {
+        document.getElementById('page-title').textContent = data.display_name + "'s Report";
+      }
+
+      // Stats
+      const scores = days.map(d => d.score);
+      const avg    = Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+      const goodDays = scores.filter(s => s >= 70).length;
+      const consistency = Math.round((goodDays / scores.length) * 100);
+      
+      document.getElementById('stat-days').textContent  = days.length;
+      document.getElementById('stat-avg').textContent   = avg + '%';
+      document.getElementById('stat-best').textContent  = consistency + '%';
+      document.getElementById('stats-row').style.display = 'flex';
+      document.getElementById('chart-section').style.display = 'flex';
+
+      // Start scrolled to the right (most recent)
+      scrollX = 0;
+
+      initCanvas();
+      animateIn();
+    })
+    .catch(() => {
+      document.getElementById('loader').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+    });
+
+  // ── Canvas setup ──────────────────────────────────────
+  function initCanvas() {
+    resize();
+    window.addEventListener('resize', resize);
+    bindEvents();
+  }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = wrap.getBoundingClientRect();
+    canvas.width  = rect.width  * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width  = rect.width  + 'px';
+    canvas.style.height = rect.height + 'px';
+    draw();
+  }
+
+  // ── Animate entry ─────────────────────────────────────
+  function animateIn() {
+    animProgress = 0;
+    const start = performance.now();
+    const dur   = 900;
+    function step(now) {
+      const t = Math.min((now - start) / dur, 1);
+      animProgress = easeOut(t);
+      draw();
+      if (t < 1) animFrame = requestAnimationFrame(step);
+    }
+    animFrame = requestAnimationFrame(step);
+  }
+
+  function easeOut(t) { return 1 - Math.pow(1-t, 3); }
+
+  // ── Draw ──────────────────────────────────────────────
+  function draw() {
+    const dpr  = window.devicePixelRatio || 1;
+    const W    = canvas.width;
+    const H    = canvas.height;
+    const ctx  = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, W, H);
+    ctx.scale(dpr, dpr);
+
+    const cW = W / dpr;
+    const cH = H / dpr;
+
+    const chartW = cW - PAD_LEFT - PAD_RIGHT;
+    const chartH = cH - PAD_TOP  - PAD_BOTTOM;
+
+    // Total scrollable width
+    const totalW    = days.length * COL_W;
+    const maxScroll = Math.max(0, totalW - chartW);
+    scrollX         = Math.max(0, Math.min(scrollX, maxScroll));
+
+    // Which days are visible
+    const startCol = Math.max(0, Math.floor(scrollX / COL_W) - 1);
+    const endCol   = Math.min(days.length - 1, startCol + Math.ceil(chartW / COL_W) + 2);
+
+    // Y scale: 0–100
+    function xPos(i) { return PAD_LEFT + (i * COL_W) - scrollX + COL_W / 2; }
+    function yPos(v) { return PAD_TOP  + chartH - (v / 100) * chartH * animProgress; }
+
+    // ── Grid lines ───────────────────────────────────
+    ctx.save();
+    // Clip slightly above PAD_TOP so the 100% line stroke and dots aren't cut off
+    ctx.rect(PAD_LEFT, PAD_TOP - 10, chartW, chartH + 10);
+    ctx.clip();
+
+    [0, 25, 50, 75, 100].forEach(v => {
+      const y = PAD_TOP + chartH - (v / 100) * chartH;
+      ctx.strokeStyle = GRID_COL;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(PAD_LEFT, y);
+      ctx.lineTo(PAD_LEFT + chartW, y);
+      ctx.stroke();
+    });
+
+    // ── Build visible points ──────────────────────────
+    const pts = [];
+    for (let i = startCol; i <= endCol; i++) {
+      pts.push({ x: xPos(i), y: yPos(days[i].score), i });
+    }
+
+    if (pts.length >= 2) {
+      // Gradient fill
+      const grad = ctx.createLinearGradient(0, PAD_TOP, 0, PAD_TOP + chartH);
+      grad.addColorStop(0, GREEN_DIM);
+      grad.addColorStop(1, GREEN_FADE);
+
+      ctx.beginPath();
+      // Smooth bezier line
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k < pts.length; k++) {
+        const prev = pts[k-1], curr = pts[k];
+        const cpx  = (prev.x + curr.x) / 2;
+        ctx.bezierCurveTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y);
+      }
+      // Fill to bottom
+      ctx.lineTo(pts[pts.length-1].x, PAD_TOP + chartH);
+      ctx.lineTo(pts[0].x, PAD_TOP + chartH);
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Line
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k < pts.length; k++) {
+        const prev = pts[k-1], curr = pts[k];
+        const cpx  = (prev.x + curr.x) / 2;
+        ctx.bezierCurveTo(cpx, prev.y, cpx, curr.y, curr.x, curr.y);
+      }
+      ctx.strokeStyle = GREEN;
+      ctx.lineWidth   = 2.5;
+      ctx.lineJoin    = 'round';
+      ctx.stroke();
+    }
+
+    // Dots
+    pts.forEach(p => {
+      const isActive = p.i === activeIdx;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isActive ? 6 : 3.5, 0, Math.PI * 2);
+      ctx.fillStyle   = isActive ? GREEN : '#0a1219';
+      ctx.strokeStyle = GREEN;
+      ctx.lineWidth   = isActive ? 0 : 2;
+      ctx.fill();
+      if (!isActive) ctx.stroke();
+    });
+
+    // Active crosshair
+    if (activeIdx >= startCol && activeIdx <= endCol) {
+      const ax = xPos(activeIdx);
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(0,229,160,0.35)';
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(ax, PAD_TOP);
+      ctx.lineTo(ax, PAD_TOP + chartH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+
+    // ── Y-axis labels ─────────────────────────────────
+    ctx.font        = `600 10px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.fillStyle   = TEXT_COL;
+    ctx.textAlign   = 'right';
+    ctx.textBaseline= 'middle';
+    [0, 25, 50, 75, 100].forEach(v => {
+      const y = PAD_TOP + chartH - (v / 100) * chartH;
+      ctx.fillText(v + '%', PAD_LEFT - 6, y);
+    });
+
+    // Y-axis line
+    ctx.strokeStyle = AXIS_COL;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(PAD_LEFT, PAD_TOP);
+    ctx.lineTo(PAD_LEFT, PAD_TOP + chartH);
+    ctx.stroke();
+
+    // X-axis line
+    ctx.beginPath();
+    ctx.moveTo(PAD_LEFT, PAD_TOP + chartH);
+    ctx.lineTo(PAD_LEFT + chartW, PAD_TOP + chartH);
+    ctx.stroke();
+
+    // ── X-axis date labels ────────────────────────────
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle    = TEXT_COL;
+    const step = Math.max(1, Math.ceil(60 / COL_W));
+    for (let i = startCol; i <= endCol; i += step) {
+      const x = xPos(i);
+      if (x < PAD_LEFT || x > PAD_LEFT + chartW) continue;
+      const d   = new Date(days[i].date + 'T00:00:00');
+      const lbl = d.getDate() + ' ' + d.toLocaleString('en-US', { month: 'short' });
+      ctx.fillText(lbl, x, PAD_TOP + chartH + 6);
+    }
+
+    // Reset transform
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ── Events ────────────────────────────────────────────
+  function bindEvents() {
+    // Mouse drag
+    canvas.addEventListener('mousedown', e => {
+      isDragging    = true;
+      dragStartX    = e.clientX;
+      dragStartScroll = scrollX;
+      hideTooltip();
+    });
+    window.addEventListener('mousemove', e => {
+      if (!isDragging) return;
+      scrollX = dragStartScroll - (e.clientX - dragStartX);
+      draw();
+    });
+    window.addEventListener('mouseup', e => {
+      if (!isDragging) return;
+      isDragging = false;
+      // If barely moved, treat as tap
+      if (Math.abs(e.clientX - dragStartX) < 5) {
+        handleTap(e.offsetX, e.offsetY);
+      }
+    });
+
+    // Touch drag
+    let touchStartX = 0, touchStartScroll = 0, touchMoved = false;
+    canvas.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      touchStartX      = t.clientX;
+      touchStartScroll = scrollX;
+      touchMoved       = false;
+    }, { passive: true });
+    canvas.addEventListener('touchmove', e => {
+      const t = e.touches[0];
+      const dx = t.clientX - touchStartX;
+      if (Math.abs(dx) > 4) touchMoved = true;
+      scrollX = touchStartScroll - dx;
+      draw();
+    }, { passive: true });
+    canvas.addEventListener('touchend', e => {
+      if (!touchMoved) {
+        const t    = e.changedTouches[0];
+        const rect = canvas.getBoundingClientRect();
+        handleTap(t.clientX - rect.left, t.clientY - rect.top);
+      }
+    });
+  }
+
+  function handleTap(cx, cy) {
+    const dpr    = window.devicePixelRatio || 1;
+    const cW     = canvas.width / dpr;
+    const cH     = canvas.height / dpr;
+    const chartW = cW - PAD_LEFT - PAD_RIGHT;
+    const chartH = cH - PAD_TOP  - PAD_BOTTOM;
+
+    if (cx < PAD_LEFT || cx > PAD_LEFT + chartW) { hideTooltip(); return; }
+    if (cy < PAD_TOP  || cy > PAD_TOP + chartH)  { hideTooltip(); return; }
+
+    const col = Math.round((cx - PAD_LEFT + scrollX - COL_W/2) / COL_W);
+    if (col < 0 || col >= days.length) { hideTooltip(); return; }
+
+    activeIdx = col;
+    draw();
+    showTooltip(col, cx);
+  }
+
+  function showTooltip(i, cx) {
+    const d  = days[i];
+    const dt = new Date(d.date + 'T00:00:00');
+    ttDate.textContent  = dt.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+    ttScore.textContent = d.score + '%';
+    ttSess.textContent  = d.sessions + ' session' + (d.sessions !== 1 ? 's' : '');
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const ttHalfW  = 70; // approx half tooltip width
+    let left = cx;
+    left = Math.max(ttHalfW + 4, Math.min(wrapRect.width - ttHalfW - 4, left));
+
+    tooltip.style.left   = left + 'px';
+    tooltip.style.top    = '12px';
+    tooltip.classList.add('tooltip--visible');
+  }
+
+  function hideTooltip() {
+    activeIdx = -1;
+    tooltip.classList.remove('tooltip--visible');
+    draw();
+  }
+
+})();
+</script>
+</body>
+</html>

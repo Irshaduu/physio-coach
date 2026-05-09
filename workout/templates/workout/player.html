@@ -1,0 +1,302 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="RehabLoop — Your hands-free physiotherapy workout coach. Audio-guided exercise timer for knee rehabilitation.">
+    <title>Therapist — Physio Coach</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'workout/css/player.css' %}">
+    <link rel="stylesheet" href="{% static 'workout/css/analysis.css' %}">
+    <link rel="manifest" href="{% static 'workout/manifest.json' %}">
+    <meta name="theme-color" content="#0a1219">
+    <link rel="apple-touch-icon" href="{% static 'workout/images/Icon-new.png' %}">
+</head>
+<body>
+    <!-- Pre-loader Overlay -->
+    <div id="preloader" class="preloader">
+        <div class="preloader__content">
+            <div class="preloader__spinner"></div>
+            <h2 class="preloader__title">Initializing Your Coach</h2>
+            <div class="preloader__progress-bar">
+                <div id="preloader-fill" class="preloader__progress-fill" style="width: 0%"></div>
+            </div>
+            <p id="preloader-status" class="preloader__status">Connecting...</p>
+        </div>
+    </div>
+
+    <div id="app" class="app" data-phase="idle" style="display: {% if show_analysis %}none{% else %}flex{% endif %};">
+
+        <!-- ===== TOP BAR ===== -->
+        <header class="topbar">
+            <div class="topbar__brand" id="brand-logo" title="Hold 2 seconds to reload" style="cursor:pointer;user-select:none;-webkit-user-select:none;">
+                <span class="topbar__icon">&#9883;</span>
+                <span class="topbar__title">Therapist</span>
+            </div>
+            <div class="topbar__right">
+                <button id="btn-lang" class="lang-btn" title="Switch Language">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <span id="lang-label" class="lang-label">EN</span>
+                </button>
+                <button id="btn-show-analysis" class="analysis-link" title="View Daily Analysis" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                </button>
+                <span id="progress-label" class="topbar__progress">0%</span>
+            </div>
+        </header>
+
+        <!-- ===== PROGRESS BAR (thin, full-width) ===== -->
+        <div class="progress-bar">
+            <div id="progress-fill" class="progress-bar__fill" style="width: 0%"></div>
+        </div>
+
+        <!-- ===== EXERCISE INFO ===== -->
+        <section class="exercise-info">
+            <p id="exercise-label" class="exercise-info__label">Exercise <span id="exercise-num">-</span> / <span id="exercise-total">9</span></p>
+            <h1 id="exercise-name" class="exercise-info__name">Ready to Begin</h1>
+            <p id="exercise-desc" class="exercise-info__desc">Press Start when you're ready.</p>
+        </section>
+
+        <!-- ===== CENTRAL RING ===== -->
+        <section class="ring-container">
+            <div class="ring-background">
+                <img id="exercise-image" class="ring-background__img" src="{% static 'workout/images/exercise_1.png' %}" alt="Exercise demonstration">
+                <div class="ring-background__overlay"></div>
+            </div>
+            <svg class="ring-svg" viewBox="0 0 200 200">
+                <circle class="ring-svg__track" cx="100" cy="100" r="88" />
+                <circle id="ring-progress" class="ring-svg__progress" cx="100" cy="100" r="88"
+                        stroke-dasharray="553" stroke-dashoffset="553" />
+            </svg>
+            <div class="ring-content">
+                <span id="countdown-number" class="ring-content__number">0</span>
+                <span id="phase-label" class="ring-content__phase">IDLE</span>
+            </div>
+        </section>
+
+        <!-- ===== REP COUNTER ===== -->
+        <section class="rep-counter">
+            <span class="rep-counter__label">REP</span>
+            <span id="rep-current" class="rep-counter__current">0</span>
+            <span class="rep-counter__separator">/</span>
+            <span id="rep-total" class="rep-counter__total">20</span>
+        </section>
+
+        <!-- ===== MOTIVATION BANNER ===== -->
+        <div id="motivation-banner" class="motivation-banner motivation-banner--hidden">
+            <span id="motivation-text"></span>
+        </div>
+
+        <!-- ===== CONTROLS ===== -->
+        <section class="controls">
+            <button id="btn-stop" class="ctrl-btn ctrl-btn--stop" disabled title="Stop">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            </button>
+            <button id="btn-start" class="ctrl-btn ctrl-btn--start" title="Start">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,4 20,12 6,20"/></svg>
+            </button>
+            <button id="btn-pause" class="ctrl-btn ctrl-btn--pause" disabled title="Pause" style="display:none;">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            </button>
+            <button id="btn-skip" class="ctrl-btn ctrl-btn--skip" disabled title="Skip Exercise">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,4 15,12 5,20"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>
+            </button>
+        </section>
+
+        <!-- ===== VOICE SELECTOR (collapsed) ===== -->
+        <details class="voice-settings">
+            <summary class="voice-settings__toggle">&#9881; Voice</summary>
+            <div class="voice-settings__panel">
+                <label for="voice-select" class="voice-settings__label">Select Voice</label>
+                <select id="voice-select" class="voice-settings__select"></select>
+                <label for="voice-rate" class="voice-settings__label">Speed: <span id="rate-value">1.0</span></label>
+                <input id="voice-rate" type="range" min="0.7" max="1.3" step="0.05" value="1.0" class="voice-settings__range">
+                <button id="btn-test-voice" class="voice-settings__test">Test Voice</button>
+                <button id="btn-close-voice" class="voice-settings__close">Done</button>
+            </div>
+        </details>
+
+        <!-- ===== CONFIRMATION MODAL ===== -->
+        <div id="confirm-modal" class="confirm-modal confirm-modal--hidden">
+            <div class="confirm-modal__content">
+                <h3 id="confirm-title" class="confirm-modal__title">Are you sure?</h3>
+                <p id="confirm-desc" class="confirm-modal__desc">Do you want to skip this exercise?</p>
+                <div class="confirm-modal__actions">
+                    <button id="btn-confirm-cancel" class="confirm-btn confirm-btn--cancel">Cancel</button>
+                    <button id="btn-confirm-action" class="confirm-btn confirm-btn--danger">Skip</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== ANALYSIS OVERLAY ===== -->
+    <div id="analysis-overlay" class="app analysis-app" style="display: {% if show_analysis %}flex{% else %}none{% endif %}; position: fixed; inset: 0; margin: 0 auto; max-width: 480px; width: 100%; height: 100%; z-index: 1000; overflow-y: auto; background-color: var(--bg-app);">
+        <header class="topbar">
+            <div class="topbar__brand">
+                <button id="btn-hide-analysis" class="back-btn" title="Back to Player" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span class="topbar__title" style="white-space: nowrap;">Analysis</span>
+            </div>
+
+            <!-- ── Graph / Reports Button ── -->
+            <a href="{% url 'workout:reports' %}" target="_blank" class="topbar__graph-btn" title="View Progress Report">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;">
+                    <polyline points="3 3 3 21 21 21"></polyline>
+                    <polyline points="3 17 9 11 15 15 21 7"></polyline>
+                </svg>
+                <span style="font-size: 0.75rem; font-weight: 800; letter-spacing: 0.02em;">...</span>
+            </a>
+
+            <div class="topbar__right">
+                <div class="date-nav">
+                    <a href="?d={{ prev_date|date:'Y-m-d' }}" class="date-nav__btn" title="Previous Day">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </a>
+                    <span class="topbar__date">{{ current_date|date:"M j, Y" }}</span>
+                    {% if next_date %}
+                    <a href="?d={{ next_date|date:'Y-m-d' }}" class="date-nav__btn" title="Next Day">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </a>
+                    {% else %}
+                    <span class="date-nav__btn date-nav__btn--disabled">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+
+        <section class="daily-summary">
+            <h2 class="section-title" style="margin-bottom: 40px;">{{ display_name }}'s Goal</h2>
+            <div class="daily-score">
+                <div class="daily-score__number">{{ daily_score }}%</div>
+                <div class="daily-score__label">Completion</div>
+            </div>
+            
+            <div class="session-slots">
+                {% for slot in slots %}
+                    <div class="slot slot--{{ forloop.counter0 }} {% if slot %}slot--filled{% else %}slot--empty{% endif %}">
+                        {% if slot %}
+                            <svg class="slot-ring" viewBox="0 0 36 36">
+                                <path class="slot-ring__track" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path class="slot-ring__progress" stroke-dasharray="{{ slot.percent }}, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                            </svg>
+                            <span class="slot-text">{{ slot.percent }}%</span>
+                        {% else %}
+                            <span class="slot-empty-icon">+</span>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            <p class="goal-desc">Complete 3 full sessions (100%) to reach your daily goal.</p>
+        </section>
+
+        <section class="session-history">
+            <h2 class="section-title">Session History ({{ total_sessions }})</h2>
+            
+            {% if all_sessions %}
+                <div class="history-list">
+                    {% for session in all_sessions %}
+                        <div class="history-card history-card--{{ session.slot_type }}">
+                            <div class="history-card__header">
+                                <span class="history-time">{{ session.started_at|time:"g:i A" }}</span>
+                                <span class="history-status status--{{ session.status }}">{{ session.status|title }}</span>
+                            </div>
+                            <div class="history-card__bar-wrap">
+                                <div class="history-card__bar" style="width: {{ session.percent }}%;"></div>
+                            </div>
+                            <div class="history-card__footer">
+                                <span>Score</span>
+                                <span class="history-score">{{ session.percent }}%</span>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>No workouts recorded today yet.</p>
+                </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- Exercise data from Django -->
+    {{ exercises|json_script:"exercise-data" }}
+
+    <script>
+        window.Therapist_IMAGES_BASE = "{% static 'workout/images/' %}";
+        window.Therapist_USER = "{{ display_name|escapejs }}";
+
+        // ── Long-press on logo to force-reload (PWA standalone has no browser UI) ──
+        (function() {
+            const logo = document.getElementById('brand-logo');
+            let pressTimer = null;
+            let pressing = false;
+
+            function startPress(e) {
+                pressing = true;
+                logo.style.opacity = '0.6';
+                logo.style.transition = 'opacity 2s linear';
+                pressTimer = setTimeout(() => {
+                    if (pressing) {
+                        logo.style.opacity = '';
+                        logo.style.transition = '';
+                        window.location.reload(true); // force reload — bypasses cache
+                    }
+                }, 2000);
+            }
+
+            function cancelPress() {
+                pressing = false;
+                clearTimeout(pressTimer);
+                logo.style.opacity = '';
+                logo.style.transition = '';
+            }
+
+            logo.addEventListener('touchstart', startPress, { passive: true });
+            logo.addEventListener('touchend', cancelPress);
+            logo.addEventListener('touchmove', cancelPress);
+            logo.addEventListener('mousedown', startPress);
+            logo.addEventListener('mouseup', cancelPress);
+            logo.addEventListener('mouseleave', cancelPress);
+        })();
+
+
+        // Analysis overlay logic
+        const btnShow = document.getElementById('btn-show-analysis');
+        const btnHide = document.getElementById('btn-hide-analysis');
+        const overlay = document.getElementById('analysis-overlay');
+        const app = document.getElementById('app');
+
+        btnShow.addEventListener('click', () => {
+            overlay.style.display = 'flex';
+            app.style.display = 'none';
+            // Push state so back button closes overlay
+            history.pushState({analysis: true}, '', window.location.pathname + '?d={{ current_date|date:"Y-m-d" }}');
+        });
+
+        btnHide.addEventListener('click', () => {
+            overlay.style.display = 'none';
+            app.style.display = 'flex';
+            history.pushState({}, '', window.location.pathname);
+        });
+
+        window.addEventListener('popstate', (e) => {
+            if (e.state && e.state.analysis) {
+                overlay.style.display = 'flex';
+                app.style.display = 'none';
+            } else {
+                overlay.style.display = 'none';
+                app.style.display = 'flex';
+            }
+        });
+    </script>
+    <script src="{% static 'workout/js/player.js' %}"></script>
+</body>
+</html>
