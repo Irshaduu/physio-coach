@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.cache import cache
+from django.db.models import Sum
 
 
 class Exercise(models.Model):
@@ -38,7 +40,7 @@ class WorkoutSession(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    date = models.DateField(auto_now_add=True)
+    date = models.DateField(auto_now_add=True, db_index=True)
     started_at = models.DateTimeField(auto_now_add=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
@@ -59,9 +61,6 @@ class WorkoutSession(models.Model):
         if not logs:
             return 0
             
-        from django.core.cache import cache
-        from django.db.models import Sum
-        
         total_reps_required = cache.get('total_workout_reps')
         if not total_reps_required:
             total_reps_required = Exercise.objects.aggregate(total=Sum('reps'))['total'] or 1
