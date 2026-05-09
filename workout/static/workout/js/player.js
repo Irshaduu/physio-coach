@@ -1041,6 +1041,7 @@
         dom.progressLabel.textContent = '100%';
 
         speak(t('workoutComplete'));
+        window.dispatchEvent(new CustomEvent('Therapist_workout_complete'));
 
         // Show completion overlay
         const overlay = document.createElement('div');

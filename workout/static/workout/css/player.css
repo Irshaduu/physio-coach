@@ -462,3 +462,47 @@ body::before {
         display: none;
     }
 }
+/* ===== INSTALL BANNER ===== */
+.install-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background: var(--bg-surface);
+    border: 1px solid var(--bg-border);
+    border-radius: var(--r-md);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    z-index: 1000;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: translateY(120%);
+    transition: transform 0.4s var(--ease);
+}
+.install-banner--visible { transform: translateY(0); }
+.install-banner__content { flex: 1; }
+.install-banner__title { font-size: 0.95rem; font-weight: 800; color: var(--text-1); margin-bottom: 2px; }
+.install-banner__desc { font-size: 0.75rem; color: var(--text-2); line-height: 1.4; }
+.install-banner__actions { display: flex; gap: 8px; }
+.install-btn {
+    padding: 8px 16px;
+    background: var(--green);
+    color: var(--bg-app);
+    border: none;
+    border-radius: var(--r-sm);
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.install-close {
+    background: transparent;
+    border: 1px solid var(--bg-border);
+    color: var(--text-2);
+    padding: 8px 12px;
+    border-radius: var(--r-sm);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
