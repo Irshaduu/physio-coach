@@ -19,8 +19,7 @@ Instead of struggling, I built this system to act as a strict, hands-free person
 
 ## 📸 Screenshots
 *(Recommended: Upload your dark-theme UI screenshots to a /docs folder and link them here)*
-![Player UI](docs/player-ui.jpg)
-![Dashboard](docs/dashboard.jpg)
+*(Add screenshots to a `/docs` folder and link them here to showcase the UI)*
 
 ## 🛠️ Full Tech Stack
 - **Backend**: Django (Python)

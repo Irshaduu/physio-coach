@@ -10,7 +10,16 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+# Load environment variables from a .env file (if present).
+# On PythonAnywhere, set these in the WSGI file or environment tab instead.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # python-dotenv not installed; rely on system environment variables
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +29,19 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9m7o34r@a5kchoco3irc944^^x$m&3tr@(*(*1$jaf*((12xe&'
+# Set the SECRET_KEY environment variable. See .env.example for instructions.
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    # Fallback for local development only — NEVER use this in production.
+    'django-insecure-replace-me-with-a-real-key-from-env'
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Set DEBUG=False in your .env or server environment for production.
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['therapist.pythonanywhere.com', '10.226.123.11', 'localhost', '127.0.0.1']
+_allowed = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
+ALLOWED_HOSTS = [h.strip() for h in _allowed.split(',') if h.strip()]
 
 
 # Application definition

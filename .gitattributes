@@ -1,0 +1,21 @@
+# Auto-detect text files and normalize line endings to LF in the repository.
+# On Windows, Git will check out with CRLF but commit with LF — consistent cross-platform.
+* text=auto
+
+# Force LF for specific text file types
+*.py    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.env*  text eol=lf
+
+# Binary files — never normalize
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.ico   binary
+*.mp3   binary
+*.wav   binary
