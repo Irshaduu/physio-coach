@@ -1,4 +1,4 @@
-# Therapist 🩺 — Physiotherapy Coach
+# PhysioCoach 🩺
 
 > **A hands-free physiotherapy web app** built after knee surgery to eliminate the cognitive load of manual counting during painful rehabilitation exercises.
 
@@ -8,7 +8,7 @@
 
 ## 💡 The Problem
 
-Following arthroscopic knee surgery, post-op physiotherapy requires completing dozens of reps of timed holds — often while in significant pain. Mentally counting 10-second holds, tracking 20 repetitions, and managing 9 exercises creates serious cognitive overhead, especially for someone with ADHD. This app eliminates that overhead entirely.
+Following arthroscopic knee surgery, post-op physiotherapy requires completing dozens of reps of timed holds — often while in significant pain. Mentally counting 10-second holds, tracking 20 repetitions, and managing 9 exercises creates serious cognitive overhead. PhysioCoach eliminates that overhead entirely — just press Start and listen.
 
 ---
 
@@ -16,7 +16,7 @@ Following arthroscopic knee surgery, post-op physiotherapy requires completing d
 
 | Feature | Description |
 |---------|-------------|
-| **Hands-Free Timers & Rep Counters** | Start the workout, set the device down. The app handles all counting and timing automatically. |
+| **Hands-Free Timers & Rep Counters** | Start the workout, set the device down. PhysioCoach handles all counting and timing automatically. |
 | **3-Tier Audio Fallback** | Web Speech API (zero latency) → Pre-cached gTTS MP3s (offline) → Live Google TTS API |
 | **Bilingual Coaching** | Full text-to-speech coaching in **English** and **Malayalam** |
 | **Offline-First** | Workouts log to `localStorage` when offline and silently sync to the server when reconnected |
@@ -40,8 +40,8 @@ Following arthroscopic knee surgery, post-op physiotherapy requires completing d
 ### 1. Clone & create environment
 
 ```bash
-git clone https://github.com/Irshaduu/rehab-coach.git
-cd rehab-coach
+git clone https://github.com/Irshaduu/physio-coach.git
+cd physio-coach
 python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # macOS / Linux
@@ -63,14 +63,14 @@ python -c "from django.core.management.utils import get_random_secret_key; print
 ### 3. Run the app
 
 ```bash
-python manage.py migrate
-python manage.py createsuperuser    # Create your admin account
+python manage.py migrate       # Sets up DB + auto-loads all 9 exercises
+python manage.py createsuperuser
 python manage.py runserver
 ```
 
 Then visit **http://127.0.0.1:8000** and log in with the superuser you just created.
 
-> **Note:** On first run, the audio cache (`media/tts_cache/`) is empty. The app will auto-generate MP3 files on demand via the Google TTS API — an internet connection is required for initial audio generation only.
+> **Note:** On first run, the audio cache (`media/tts_cache/`) is empty. PhysioCoach will auto-generate MP3s on demand via the Google TTS API — an internet connection is required for initial audio generation only. The app also works immediately via the browser's built-in Web Speech API.
 
 ---
 
