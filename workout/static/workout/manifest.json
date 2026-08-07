@@ -1,6 +1,6 @@
 {
-  "name": "Therapist — Physio Coach",
-  "short_name": "Therapist",
+  "name": "PhysioCoach",
+  "short_name": "PhysioCoach",
   "description": "Your hands-free physiotherapy workout coach.",
   "start_url": "/",
   "display": "standalone",

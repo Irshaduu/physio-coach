@@ -29,8 +29,8 @@
                 ? `Amazing work, ${USER_NAME}! You have finished the entire routine for today. Your knee is getting stronger every day! Be proud!`
                 : `Amazing work! You have finished the entire routine for today. Your knee is getting stronger every day! Be proud!`,
             testVoice: USER_NAME
-                ? `Hello ${USER_NAME}! I am your Therapist coach. I will be guiding you step-by-step through today's exercises. Let's get started!`
-                : `Hello! I am your Therapist coach. I will be guiding you step-by-step through today's exercises. Let's get started!`,
+                ? `Hello ${USER_NAME}! I am your PhysioCoach. I will be guiding you step-by-step through today's exercises. Let's get started!`
+                : `Hello! I am your PhysioCoach. I will be guiding you step-by-step through today's exercises. Let's get started!`,
             readyTitle: 'Ready to Begin',
             readyDesc: "Press Start when you're ready.",
             phase_announce: 'ANNOUNCE',
