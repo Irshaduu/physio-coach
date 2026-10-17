@@ -1,5 +1,5 @@
 /* ============================================================
-   Therapist — Player Engine
+   PhysioCoach — Player Engine
    Speech-driven state machine for audio-visual workout guidance.
    ============================================================ */
 
@@ -350,7 +350,7 @@
         }
 
         dom.exerciseTotal.textContent = exercises.length;
-        console.log(`[Therapist] Loaded ${exercises.length} exercises`);
+        console.log(`[PhysioCoach] Loaded ${exercises.length} exercises`);
     }
 
     async function fetchExercisesFromAPI() {
@@ -359,9 +359,9 @@
             const data = await resp.json();
             exercises = data.exercises;
             dom.exerciseTotal.textContent = exercises.length;
-            console.log(`[Therapist] Loaded ${exercises.length} exercises from API`);
+            console.log(`[PhysioCoach] Loaded ${exercises.length} exercises from API`);
         } catch (err) {
-            console.error('[Therapist] Failed to load exercises:', err);
+            console.error('[PhysioCoach] Failed to load exercises:', err);
         }
     }
 
@@ -405,7 +405,7 @@
                 if (isRunning) saveLocalState();
             }
         } catch (err) {
-            console.warn('[Therapist] Sync failed. Queuing for offline retry:', err);
+            console.warn('[PhysioCoach] Sync failed. Queuing for offline retry:', err);
             queueOfflineSync(payload);
         }
     }
@@ -431,7 +431,7 @@
             let queue = JSON.parse(localStorage.getItem('Therapist_offline_queue') || '[]');
             if (queue.length === 0) return;
             
-            console.log(`[Therapist] Processing ${queue.length} offline sync items...`);
+            console.log(`[PhysioCoach] Processing ${queue.length} offline sync items...`);
             let remaining = [];
             
             for (let payload of queue) {
@@ -676,7 +676,7 @@
             dom.voiceSelect.selectedIndex = -1;
         }
 
-        console.log(`[Therapist] Voice set for ${currentLang}: ${selectedVoice?.name || 'System Default'}`);
+        console.log(`[PhysioCoach] Voice set for ${currentLang}: ${selectedVoice?.name || 'System Default'}`);
     }
 
     function updateUIForLanguage() {
@@ -1011,10 +1011,10 @@
 
         } catch (err) {
             if (err.message === 'WORKOUT_STOPPED') {
-                console.log('[Therapist] Workout stopped by user');
+                console.log('[PhysioCoach] Workout stopped by user');
                 resetUI();
             } else {
-                console.error('[Therapist] Unexpected error:', err);
+                console.error('[PhysioCoach] Unexpected error:', err);
             }
         } finally {
             isRunning = false;
@@ -1336,10 +1336,10 @@
 
         } catch (err) {
             if (err.message === 'WORKOUT_STOPPED') {
-                console.log('[Therapist] Workout stopped by user');
+                console.log('[PhysioCoach] Workout stopped by user');
                 resetUI();
             } else {
-                console.error('[Therapist] Error:', err);
+                console.error('[PhysioCoach] Error:', err);
             }
         } finally {
             isRunning = false;
@@ -1376,7 +1376,7 @@
                 }
             }
         } catch (e) {
-            console.warn('[Therapist] Failed to load saved state');
+            console.warn('[PhysioCoach] Failed to load saved state');
         }
 
         updateUIForLanguage();
@@ -1437,7 +1437,7 @@
 
         // (Removed the periodic pause/resume nudge as it causes freezes on Android Chrome during active speech)
 
-        console.log('[Therapist] Player initialized');
+        console.log('[PhysioCoach] Player initialized');
     }
 
     // Boot

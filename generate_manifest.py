@@ -31,7 +31,7 @@ def main():
             'exercise': 'Exercise', 'rep': 'Rep', 'hold': 'Hold', 'relax': 'Relax',
             'exerciseDone': 'And relax. Great job on that set.',
             'workoutComplete': "Amazing work! You have finished the entire routine for today. Your knee is getting stronger every day! Be proud!",
-            'testVoice': "Hello! I am your Therapist coach. I will be guiding you step-by-step through today's exercises. Let's get started!",
+            'testVoice': "Hello! I am your PhysioCoach. I will be guiding you step-by-step through today's exercises. Let's get started!",
             'phase_hold': 'HOLD', 'phase_relax': 'RELAX', 'phase_rest': 'REST',
         },
         'ml': {

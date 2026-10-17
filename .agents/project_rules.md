@@ -1,4 +1,4 @@
-# 🤖 Project Rules & AI Context (Therapist 🩺)
+# 🤖 Project Rules & AI Context (PhysioCoach 🩺)
 
 > **Context for AI Agents**: Read this document to understand the core philosophy, structure, and needs of this project before making modifications.
 
