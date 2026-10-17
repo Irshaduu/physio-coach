@@ -754,3 +754,86 @@ class DataIsolationTest(TestCase):
         response = self.client.get(reverse('workout:performance_api'))
         data = response.json()
         self.assertEqual(data['days'], [])
+
+
+# =============================================================================
+# One-tap Demo
+# =============================================================================
+
+class DemoViewTest(TestCase):
+    """The demo signs in a throwaway guest with ten days of sample progress."""
+
+    def setUp(self):
+        self.client = Client()
+        cache.clear()
+
+    def _guest(self):
+        return User.objects.get(groups__name='Demo guests')
+
+    def test_demo_signs_in_a_guest_and_opens_the_player(self):
+        response = self.client.post(reverse('workout:demo'))
+        self.assertRedirects(response, reverse('workout:player'))
+        guest = self._guest()
+        self.assertTrue(guest.username.startswith('guest-'))
+        self.assertEqual(guest.first_name, 'Guest')
+        self.assertFalse(guest.has_usable_password())
+        self.assertEqual(int(self.client.session['_auth_user_id']), guest.id)
+
+    def test_demo_seeds_ten_past_days_that_improve(self):
+        self.client.post(reverse('workout:demo'))
+        days = self.client.get(reverse('workout:performance_api')).json()['days']
+        today = timezone.localdate()
+        dates = [datetime.date.fromisoformat(d['date']) for d in days]
+        self.assertTrue(dates)
+        self.assertTrue(all(today - datetime.timedelta(days=10) <= d < today for d in dates))
+        self.assertLess(days[0]['score'], days[-1]['score'])
+
+    def test_demo_leaves_today_for_the_visitor(self):
+        self.client.post(reverse('workout:demo'))
+        guest = self._guest()
+        self.assertFalse(WorkoutSession.objects.filter(user=guest, date=timezone.localdate()).exists())
+
+    def test_demo_needs_a_post(self):
+        response = self.client.get(reverse('workout:demo'))
+        self.assertRedirects(response, reverse('workout:login'))
+        self.assertFalse(User.objects.exists())
+
+    def test_demo_is_limited_per_address(self):
+        for _ in range(10):
+            self.client.post(reverse('workout:demo'))
+            self.client.post(reverse('workout:logout'))
+        response = self.client.post(reverse('workout:demo'))
+        self.assertEqual(response.status_code, 429)
+        self.assertContains(response, 'Too many demo accounts', status_code=429)
+        self.assertEqual(User.objects.filter(groups__name='Demo guests').count(), 10)
+
+    def test_yesterdays_guests_are_deleted_with_their_sessions(self):
+        self.client.post(reverse('workout:demo'))
+        old = self._guest()
+        User.objects.filter(pk=old.pk).update(date_joined=timezone.now() - datetime.timedelta(days=2))
+        real = _create_user('asha', 'pass123')
+        User.objects.filter(pk=real.pk).update(date_joined=timezone.now() - datetime.timedelta(days=30))
+        _create_session(real)
+        self.client.post(reverse('workout:logout'))
+
+        self.client.post(reverse('workout:demo'))
+        self.assertFalse(User.objects.filter(pk=old.pk).exists())
+        self.assertFalse(WorkoutSession.objects.filter(user_id=old.pk).exists())
+        self.assertTrue(WorkoutSession.objects.filter(user=real).exists())
+
+    def test_signed_in_user_goes_straight_to_the_player(self):
+        _create_user('asha', 'pass123')
+        self.client.login(username='asha', password='pass123')
+        response = self.client.post(reverse('workout:demo'))
+        self.assertRedirects(response, reverse('workout:player'))
+        self.assertFalse(User.objects.filter(groups__name='Demo guests').exists())
+
+    def test_login_and_register_pages_offer_the_demo(self):
+        for name in ('workout:login', 'workout:register'):
+            self.assertContains(self.client.get(reverse(name)), 'Try the demo')
+
+    def test_guest_sees_the_player_by_name(self):
+        self.client.post(reverse('workout:demo'))
+        response = self.client.get(reverse('workout:player'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Guest')

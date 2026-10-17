@@ -1,0 +1,8 @@
+{# One tap in, no sign-up: a guest account with ten days of sample progress. #}
+<div class="auth-or"><span>or</span></div>
+<form method="post" action="{% url 'workout:demo' %}" class="demo-form">
+    {% csrf_token %}
+    {% if demo_error %}<div class="form-error">{{ demo_error }}</div>{% endif %}
+    <button type="submit" class="demo-btn">Try the demo</button>
+    <p class="demo-note">A guest account with 10 days of sample progress. No sign-up.</p>
+</form>

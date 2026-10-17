@@ -1,5 +1,7 @@
 import io
 import json
+import random
+import secrets
 import datetime
 from django.utils import timezone
 from django.http import JsonResponse, HttpResponse
@@ -8,9 +10,17 @@ from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import login, logout
 from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import Group, User
+from django.core.cache import cache
+from django.db import transaction
 from .forms import UserRegistrationForm
 
 from .models import Exercise, WorkoutSession, ExerciseLog
+
+# One-tap demo accounts
+DEMO_GROUP = 'Demo guests'
+GUEST_LIFETIME = datetime.timedelta(days=1)
+DEMO_LIMIT_PER_HOUR = 10  # per address, so nobody can mint accounts in a loop
 
 
 # ─── TTS Endpoint (Google Text-to-Speech via gTTS) ──────────────────────────
@@ -366,4 +376,90 @@ def logout_view(request):
         logout(request)
         return redirect('workout:login')
     # If GET, redirect to player (which will redirect to login if logged out)
+    return redirect('workout:player')
+
+
+# ─── One-tap demo ────────────────────────────────────────────────────────────
+def _client_ip(request):
+    # Behind the host's proxy the socket address is the proxy's; the first forwarded one is the visitor.
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    return forwarded.split(',')[0].strip() or request.META.get('REMOTE_ADDR', '')
+
+
+def _seed_progress(user):
+    """Ten past days of morning, afternoon and evening sessions, improving the way a recovery does.
+
+    Today is left empty, so the visitor's own first session is today's.
+    """
+    exercises = list(Exercise.objects.order_by('order'))
+    total_reps = sum(e.reps for e in exercises)
+    if not total_reps:
+        return
+    rng = random.Random(user.id)
+    today = timezone.localdate()
+
+    for days_ago in range(10, 0, -1):
+        day = today - datetime.timedelta(days=days_ago)
+        base = 35 + (10 - days_ago) * 6.5  # about 35% ten days ago, about 94% yesterday
+        for hour, minute in ((9, 30), (14, 0), (19, 45)):
+            if rng.random() < 0.15:
+                continue  # a missed session, as real weeks have
+            pct = max(10, min(100, base + rng.randint(-12, 10)))
+            started = timezone.make_aware(datetime.datetime.combine(day, datetime.time(hour, minute)))
+            session = WorkoutSession.objects.create(user=user, status='completed' if pct >= 90 else 'abandoned')
+            # date and started_at are auto_now_add, so they are set after the row exists.
+            WorkoutSession.objects.filter(pk=session.pk).update(
+                date=day, started_at=started,
+                ended_at=started + datetime.timedelta(minutes=round(25 * pct / 100) + 3),
+            )
+            left = round(total_reps * pct / 100)
+            logs = []
+            for exercise in exercises:
+                if left <= 0:
+                    break
+                reps = min(exercise.reps, left)
+                left -= reps
+                logs.append(ExerciseLog(session=session, exercise=exercise, reps_completed=reps))
+            ExerciseLog.objects.bulk_create(logs)
+
+
+@transaction.atomic
+def _new_guest():
+    """A throwaway account with no password: nobody can log in to it again."""
+    for _ in range(50):
+        name = f'guest-{secrets.token_hex(3)}'
+        if not User.objects.filter(username=name).exists():
+            break
+    else:
+        raise RuntimeError('No free guest name')
+    user = User(username=name, first_name='Guest')
+    user.set_unusable_password()
+    user.save()
+    user.groups.add(Group.objects.get_or_create(name=DEMO_GROUP)[0])
+    _seed_progress(user)
+    return user
+
+
+def demo_view(request):
+    """One tap from the login page into the app, as a guest with ten days of sample progress."""
+    if request.method != 'POST':
+        return redirect('workout:login')
+
+    if not request.user.is_authenticated:
+        key = f'demo:{_client_ip(request)}'
+        made = cache.get(key, 0)
+        if made >= DEMO_LIMIT_PER_HOUR:
+            return render(request, 'workout/login.html', {
+                'form': AuthenticationForm(),
+                'demo_error': 'Too many demo accounts from here. Try again in an hour.',
+            }, status=429)
+        cache.set(key, made + 1, 60 * 60)
+
+        # Yesterday's guests (and their sessions) go before today's is made, so they never pile up.
+        User.objects.filter(
+            groups__name=DEMO_GROUP, date_joined__lt=timezone.now() - GUEST_LIFETIME
+        ).delete()
+        login(request, _new_guest())
+        request.session.set_expiry(int(GUEST_LIFETIME.total_seconds()))
+
     return redirect('workout:player')
