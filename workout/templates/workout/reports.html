@@ -70,6 +70,24 @@
   /* Ambient glow */
   body::before { content:''; position:fixed; top:-120px; left:50%; transform:translateX(-50%); width:600px; height:300px; background:radial-gradient(ellipse, rgba(0,229,160,0.07) 0%, transparent 70%); pointer-events:none; z-index:0; }
   .page { position: relative; z-index: 1; }
+
+  /* Desktop: the report fills the window, and the chart takes all the height that is left. */
+  @media (min-width: 900px) {
+    .page { max-width: none; padding: 8px clamp(24px, 4vw, 64px) 28px; }
+    .topbar { padding: 20px 0 18px; }
+    .topbar__title { font-size: 1.4rem; }
+    .stats-row { gap: 16px; padding: 0 0 28px; }
+    .stat-card { padding: 22px 26px; }
+    .stat-card__val { font-size: 2.4rem; }
+    .stat-card__label { font-size: 0.75rem; margin-top: 4px; }
+    .chart-section { padding: 0; gap: 14px; }
+    .chart-title { font-size: 0.8rem; }
+    .chart-legend { font-size: 0.75rem; }
+    .chart-wrap { flex: 1; height: auto; min-height: 340px; }
+    #chart { position: absolute; inset: 0; } /* sized by the wrap, so it never pushes the wrap taller */
+    .scroll-hint { font-size: 0.75rem; }
+    body::before { width: 1400px; height: 460px; }
+  }
 </style>
 </head>
 <body>
@@ -145,10 +163,11 @@
   const PAD_RIGHT   = 16;
   const PAD_TOP     = 20;
   const PAD_BOTTOM  = 36;   // X-axis labels height
-  const COL_W       = 52;   // pixels per day column
+  const COL_W       = 52;   // narrowest day column; columns widen to fill a wide chart
 
   let days = [];
-  let scrollX = 0;           // pixels scrolled from the right edge
+  let scrollX = 0;           // pixels scrolled from the oldest day
+  let stickRight = true;     // keep the most recent days in view until the user drags
   let isDragging = false;
   let dragStartX = 0;
   let dragStartScroll = 0;
@@ -159,6 +178,7 @@
   const canvas  = document.getElementById('chart');
   const tooltip = document.getElementById('tooltip');
   const wrap    = document.getElementById('chart-wrap');
+  const hint    = document.getElementById('scroll-hint');
   const ttDate  = document.getElementById('tt-date');
   const ttScore = document.getElementById('tt-score');
   const ttSess  = document.getElementById('tt-sessions');
@@ -200,7 +220,7 @@
       document.getElementById('chart-section').style.display = 'flex';
 
       // Start scrolled to the right (most recent)
-      scrollX = 0;
+      stickRight = true;
 
       initCanvas();
       animateIn();
@@ -243,6 +263,11 @@
 
   function easeOut(t) { return 1 - Math.pow(1-t, 3); }
 
+  // Days fill the chart's width when they fit, and scroll at COL_W each when they don't.
+  function colWidth(chartW) {
+    return days.length ? Math.max(COL_W, chartW / days.length) : COL_W;
+  }
+
   // ── Draw ──────────────────────────────────────────────
   function draw() {
     const dpr  = window.devicePixelRatio || 1;
@@ -260,16 +285,19 @@
     const chartH = cH - PAD_TOP  - PAD_BOTTOM;
 
     // Total scrollable width
-    const totalW    = days.length * COL_W;
+    const colW      = colWidth(chartW);
+    const totalW    = days.length * colW;
     const maxScroll = Math.max(0, totalW - chartW);
+    if (stickRight) scrollX = maxScroll;
     scrollX         = Math.max(0, Math.min(scrollX, maxScroll));
+    hint.style.visibility = maxScroll > 0 ? 'visible' : 'hidden';
 
     // Which days are visible
-    const startCol = Math.max(0, Math.floor(scrollX / COL_W) - 1);
-    const endCol   = Math.min(days.length - 1, startCol + Math.ceil(chartW / COL_W) + 2);
+    const startCol = Math.max(0, Math.floor(scrollX / colW) - 1);
+    const endCol   = Math.min(days.length - 1, startCol + Math.ceil(chartW / colW) + 2);
 
     // Y scale: 0–100
-    function xPos(i) { return PAD_LEFT + (i * COL_W) - scrollX + COL_W / 2; }
+    function xPos(i) { return PAD_LEFT + (i * colW) - scrollX + colW / 2; }
     function yPos(v) { return PAD_TOP  + chartH - (v / 100) * chartH * animProgress; }
 
     // ── Grid lines ───────────────────────────────────
@@ -357,7 +385,7 @@
     ctx.restore();
 
     // ── Y-axis labels ─────────────────────────────────
-    ctx.font        = `600 10px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.font        = `600 ${cW >= 800 ? 12 : 10}px ${getComputedStyle(document.body).fontFamily}`;
     ctx.fillStyle   = TEXT_COL;
     ctx.textAlign   = 'right';
     ctx.textBaseline= 'middle';
@@ -384,7 +412,7 @@
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'top';
     ctx.fillStyle    = TEXT_COL;
-    const step = Math.max(1, Math.ceil(60 / COL_W));
+    const step = Math.max(1, Math.ceil(60 / colW));
     for (let i = startCol; i <= endCol; i += step) {
       const x = xPos(i);
       if (x < PAD_LEFT || x > PAD_LEFT + chartW) continue;
@@ -402,6 +430,7 @@
     // Mouse drag
     canvas.addEventListener('mousedown', e => {
       isDragging    = true;
+      stickRight    = false;
       dragStartX    = e.clientX;
       dragStartScroll = scrollX;
       hideTooltip();
@@ -427,6 +456,7 @@
       touchStartX      = t.clientX;
       touchStartScroll = scrollX;
       touchMoved       = false;
+      stickRight       = false;
     }, { passive: true });
     canvas.addEventListener('touchmove', e => {
       const t = e.touches[0];
@@ -454,7 +484,8 @@
     if (cx < PAD_LEFT || cx > PAD_LEFT + chartW) { hideTooltip(); return; }
     if (cy < PAD_TOP  || cy > PAD_TOP + chartH)  { hideTooltip(); return; }
 
-    const col = Math.round((cx - PAD_LEFT + scrollX - COL_W/2) / COL_W);
+    const colW = colWidth(chartW);
+    const col  = Math.round((cx - PAD_LEFT + scrollX - colW/2) / colW);
     if (col < 0 || col >= days.length) { hideTooltip(); return; }
 
     activeIdx = col;
