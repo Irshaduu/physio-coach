@@ -15,6 +15,7 @@ from django.core.cache import cache
 
 from .models import Exercise, WorkoutSession, ExerciseLog
 from .forms import UserRegistrationForm
+from .views import DEMO_SLOTS, _demo_plan
 
 
 # =============================================================================
@@ -784,9 +785,12 @@ class DemoViewTest(TestCase):
         days = self.client.get(reverse('workout:performance_api')).json()['days']
         today = timezone.localdate()
         dates = [datetime.date.fromisoformat(d['date']) for d in days]
-        self.assertTrue(dates)
+        self.assertEqual(len(dates), 10)
         self.assertTrue(all(today - datetime.timedelta(days=10) <= d < today for d in dates))
-        self.assertLess(days[0]['score'], days[-1]['score'])
+        scores = [d['score'] for d in days]
+        self.assertGreaterEqual(scores[-1], 85)
+        self.assertGreaterEqual(scores[-1] - scores[0], 40)
+        self.assertGreaterEqual(sum(s >= 70 for s in scores), 4)  # the report's "good days"
 
     def test_demo_leaves_today_for_the_visitor(self):
         self.client.post(reverse('workout:demo'))
@@ -837,3 +841,33 @@ class DemoViewTest(TestCase):
         response = self.client.get(reverse('workout:player'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Guest')
+
+
+class DemoPlanTest(TestCase):
+    """Every guest's sample progress reads as a recovery, whatever their id draws."""
+
+    def _scores(self, seed):
+        # Scored as the report does: the mean of the three slots, a missed slot counting as zero.
+        days = {}
+        for days_ago, slot, pct in _demo_plan(seed):
+            days.setdefault(days_ago, [0, 0, 0])[DEMO_SLOTS.index(slot)] = pct
+        return [round(sum(days[d]) / 3) for d in range(10, 0, -1)]
+
+    def test_every_guest_ends_high_after_a_real_climb(self):
+        for seed in range(1, 501):
+            scores = self._scores(seed)
+            self.assertGreaterEqual(scores[-1], 85, seed)
+            self.assertLessEqual(scores[0], 50, seed)
+            self.assertGreaterEqual(sum(s >= 70 for s in scores), 4, seed)
+
+    def test_one_missed_session_in_the_first_days(self):
+        for seed in range(1, 501):
+            plan = _demo_plan(seed)
+            self.assertEqual(len(plan), 29, seed)
+            have = {(days_ago, slot) for days_ago, slot, _ in plan}
+            missed = [(d, s) for d in range(1, 11) for s in DEMO_SLOTS if (d, s) not in have]
+            self.assertEqual(len(missed), 1, seed)
+            self.assertGreaterEqual(missed[0][0], 7, seed)
+
+    def test_same_guest_same_progress(self):
+        self.assertEqual(_demo_plan(42), _demo_plan(42))

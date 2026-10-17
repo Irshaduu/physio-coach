@@ -22,7 +22,7 @@ Following arthroscopic knee surgery, post-op physiotherapy requires completing d
 | **Offline-First** | Workouts log to `localStorage` when offline and silently sync to the server when reconnected |
 | **Screen WakeLock** | Prevents the screen from going dark mid-exercise using the browser WakeLock API |
 | **Progress Dashboard** | Daily adherence graphs, completion scores, and full session history |
-| **One-Tap Demo** | "Try the demo" on the login page signs in a throwaway guest (no password) with ten past days of sample sessions, so the graphs have something to show. Guests are deleted after a day, and each address can make 10 an hour |
+| **One-Tap Demo** | "Try the demo" on the login page signs in a throwaway guest (no password) with ten past days of sample sessions: a steady climb from about 40% to over 85%, with one missed session early on, so the graphs show what a recovery looks like. Guests are deleted after a day, and each address can make 10 an hour |
 
 ---
 

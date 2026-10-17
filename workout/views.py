@@ -386,8 +386,32 @@ def _client_ip(request):
     return forwarded.split(',')[0].strip() or request.META.get('REMOTE_ADDR', '')
 
 
+DEMO_SLOTS = ((9, 30), (14, 0), (19, 45))  # one session in each of the report's three slots
+
+
+def _demo_plan(seed):
+    """Ten past days of sample sessions, as (days_ago, (hour, minute), percent), improving the way a recovery does.
+
+    The report scores a day as the mean of its three slots, a missed slot counting as zero, and
+    calls 70% or more a good day. So the climb is steady, from about 38% ten days ago to about 96%
+    yesterday, with a little wobble from day to day and session to session, and one missed
+    session in the first, hardest days, as real weeks have. (Misses anywhere would cost whole
+    days a third of their score and could hand a visitor a flat, failing report.)
+    """
+    rng = random.Random(seed)
+    missed = (rng.randint(7, 10), rng.randrange(len(DEMO_SLOTS)))
+    plan = []
+    for days_ago in range(10, 0, -1):
+        day = 38 + (10 - days_ago) * 6.5 + rng.randint(-4, 4)
+        for i, slot in enumerate(DEMO_SLOTS):
+            pct = max(10, min(100, round(day + rng.randint(-4, 4))))
+            if (days_ago, i) != missed:
+                plan.append((days_ago, slot, pct))
+    return plan
+
+
 def _seed_progress(user):
-    """Ten past days of morning, afternoon and evening sessions, improving the way a recovery does.
+    """Ten past days of morning, afternoon and evening sessions, as _demo_plan lays them out.
 
     Today is left empty, so the visitor's own first session is today's.
     """
@@ -395,32 +419,26 @@ def _seed_progress(user):
     total_reps = sum(e.reps for e in exercises)
     if not total_reps:
         return
-    rng = random.Random(user.id)
     today = timezone.localdate()
 
-    for days_ago in range(10, 0, -1):
+    for days_ago, (hour, minute), pct in _demo_plan(user.id):
         day = today - datetime.timedelta(days=days_ago)
-        base = 35 + (10 - days_ago) * 6.5  # about 35% ten days ago, about 94% yesterday
-        for hour, minute in ((9, 30), (14, 0), (19, 45)):
-            if rng.random() < 0.15:
-                continue  # a missed session, as real weeks have
-            pct = max(10, min(100, base + rng.randint(-12, 10)))
-            started = timezone.make_aware(datetime.datetime.combine(day, datetime.time(hour, minute)))
-            session = WorkoutSession.objects.create(user=user, status='completed' if pct >= 90 else 'abandoned')
-            # date and started_at are auto_now_add, so they are set after the row exists.
-            WorkoutSession.objects.filter(pk=session.pk).update(
-                date=day, started_at=started,
-                ended_at=started + datetime.timedelta(minutes=round(25 * pct / 100) + 3),
-            )
-            left = round(total_reps * pct / 100)
-            logs = []
-            for exercise in exercises:
-                if left <= 0:
-                    break
-                reps = min(exercise.reps, left)
-                left -= reps
-                logs.append(ExerciseLog(session=session, exercise=exercise, reps_completed=reps))
-            ExerciseLog.objects.bulk_create(logs)
+        started = timezone.make_aware(datetime.datetime.combine(day, datetime.time(hour, minute)))
+        session = WorkoutSession.objects.create(user=user, status='completed' if pct >= 90 else 'abandoned')
+        # date and started_at are auto_now_add, so they are set after the row exists.
+        WorkoutSession.objects.filter(pk=session.pk).update(
+            date=day, started_at=started,
+            ended_at=started + datetime.timedelta(minutes=round(25 * pct / 100) + 3),
+        )
+        left = round(total_reps * pct / 100)
+        logs = []
+        for exercise in exercises:
+            if left <= 0:
+                break
+            reps = min(exercise.reps, left)
+            left -= reps
+            logs.append(ExerciseLog(session=session, exercise=exercise, reps_completed=reps))
+        ExerciseLog.objects.bulk_create(logs)
 
 
 @transaction.atomic

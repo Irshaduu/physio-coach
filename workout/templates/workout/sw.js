@@ -1,5 +1,5 @@
 // Bump the version whenever a cached file changes, so installed phones drop their old copies.
-const CACHE_NAME = 'physiocoach-cache-v2';
+const CACHE_NAME = 'physiocoach-cache-v3';
 const ASSETS = [
   '/',
   '/static/workout/css/player.css',

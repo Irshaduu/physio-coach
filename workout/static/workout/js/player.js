@@ -830,33 +830,35 @@
         });
     }
 
-    function checkAborted() {
-        if (!isRunning) throw new Error('WORKOUT_STOPPED');
-    }
+    // ─── Runs ───────────────────────────────────────────────
+    // Every run of the workout loop gets a number. Start, Skip and Stop move it on, so a loop that
+    // wakes from a wait after that (a hold second, a spoken line, a rest) finds it is out of date
+    // and quits without touching the screen. Only one loop ever counts.
+    let runId = 0;
 
 
     // ─── Visual-only countdown (for silent rest) ────────────
-    function visualCountdown(seconds) {
+    function visualCountdown(seconds, run) {
         return new Promise((resolve) => {
             let remaining = seconds;
             setCountdown(remaining);
             setRingProgress(1);
 
             const interval = setInterval(async () => {
+                if (run !== runId) {
+                    clearInterval(interval);
+                    resolve();
+                    return;
+                }
+
                 // Handle pause
                 if (isPaused) {
                     clearInterval(interval);
                     await waitIfPaused();
-                    if (!isRunning) { clearInterval(interval); resolve(); return; }
+                    if (run !== runId) { resolve(); return; }
                     // Restart from where we left off
-                    const resumed = visualCountdown(remaining);
+                    const resumed = visualCountdown(remaining, run);
                     resumed.then(resolve);
-                    return;
-                }
-
-                if (!isRunning) {
-                    clearInterval(interval);
-                    resolve();
                     return;
                 }
 
@@ -876,33 +878,45 @@
 
 
     // ─── Main Workout Flow ──────────────────────────────────
-    async function runWorkout() {
+    // One loop for a fresh start, a resumed session and a skip: it begins at exercise startIdx, rep startRep.
+    async function runWorkout(startIdx = 0, startRep = 1) {
+        const run = ++runId;
+        // After every wait, before touching anything: has Skip or Stop moved on?
+        const checkAborted = () => {
+            if (run !== runId) throw new Error('WORKOUT_STOPPED');
+        };
+
         isRunning = true;
         isPaused = false;
-        currentExerciseIdx = 0;
+        currentExerciseIdx = startIdx;
         currentRep = 0;
 
-        // Do not await this: let the wake lock initialize in the background 
+        dom.btnStart.style.display = 'none';
+        dom.btnPause.style.display = '';
+        dom.btnPause.disabled = false;
+        dom.btnStop.disabled = false;
+        dom.btnSkip.disabled = false;
+
+        // Do not await this: let the wake lock initialize in the background
         // so the UI immediately updates to "Exercise 1" without a delay.
         acquireWakeLock();
 
         try {
-            for (let exIdx = 0; exIdx < exercises.length; exIdx++) {
+            for (let exIdx = startIdx; exIdx < exercises.length; exIdx++) {
                 currentExerciseIdx = exIdx;
                 const ex = exercises[exIdx];
                 const reps = ex.reps || 20;
                 const holdSecs = ex.hold_seconds || 10;
                 const restSecs = ex.rest_seconds || 5;
-
-                updateUIForLanguage();
-
+                // A resumed session picks up mid-exercise; every exercise after it starts at rep 1.
+                const firstRep = exIdx === startIdx ? startRep : 1;
 
                 // ── Announce Exercise ──
-                checkAborted();
                 await waitIfPaused();
+                checkAborted();
                 setPhase('announce');
                 updateUIForLanguage();
-                
+
                 dom.repCurrent.textContent = '0';
                 dom.repTotal.textContent = reps;
                 setCountdown('');
@@ -912,16 +926,20 @@
                 await speak(t('announce')(exIdx + 1, getName(ex), getDesc(ex)));
                 checkAborted();
                 await waitIfPaused();
+                checkAborted();
 
-                // Brief pause after announcement
-                await delay(800);
+                // Brief pause after announcement, unless picking up mid-exercise
+                if (firstRep === 1) {
+                    await delay(800);
+                    checkAborted();
+                }
 
                 // ── Rep Loop ──
-                for (let rep = 1; rep <= reps; rep++) {
+                for (let rep = firstRep; rep <= reps; rep++) {
+                    await waitIfPaused();
+                    checkAborted();
                     currentRep = rep;
                     saveLocalState();
-                    checkAborted();
-                    await waitIfPaused();
 
                     // Motivational phrase every 4 reps (starting from rep 4)
                     let repAnnouncement = `${t('rep')} ${rep}`;
@@ -941,12 +959,14 @@
                         await speak(motivationalPhrase);
                         checkAborted();
                         await waitIfPaused();
+                        checkAborted();
                     }
                     await speak(repAnnouncement);
                     checkAborted();
                     await waitIfPaused();
+                    checkAborted();
 
-                    // ── HOLD Phase: speech-driven countdown ──
+                    // ── HOLD Phase: the clock counts, the voice follows ──
                     setPhase('hold');
                     await speak(t('hold'));
                     checkAborted();
@@ -960,7 +980,7 @@
 
                         // Speak the number (fire and forget so it doesn't block the timer)
                         speak(String(sec)).catch(e => console.warn(e));
-                        
+
                         // Wait exactly 1 real second
                         await delay(1000);
                         checkAborted();
@@ -974,7 +994,8 @@
                     if (rep < reps) {
                         await speak(t('relax'));
                         checkAborted();
-                        await visualCountdown(restSecs);
+                        await visualCountdown(restSecs, run);
+                        checkAborted();
                     } else {
                         // Last rep of this exercise
                         await speak(t('exerciseDone'));
@@ -986,8 +1007,8 @@
 
                 // ── Exercise Rest (between exercises) ──
                 if (exIdx < exercises.length - 1) {
-                    checkAborted();
                     await waitIfPaused();
+                    checkAborted();
                     setPhase('exercise-rest');
 
                     // Update state to next exercise for the UI
@@ -1001,7 +1022,7 @@
                     // Sync to server after each exercise completes naturally
                     syncState('in_progress');
 
-                    await visualCountdown(EXERCISE_REST_SECONDS);
+                    await visualCountdown(EXERCISE_REST_SECONDS, run);
                     checkAborted();
                 }
             }
@@ -1010,16 +1031,17 @@
             onWorkoutComplete();
 
         } catch (err) {
-            if (err.message === 'WORKOUT_STOPPED') {
-                console.log('[PhysioCoach] Workout stopped by user');
-                resetUI();
-            } else {
+            // A stopped run says nothing: Stop has already reset the screen, or Skip's new run owns it.
+            if (err.message !== 'WORKOUT_STOPPED') {
                 console.error('[PhysioCoach] Unexpected error:', err);
             }
         } finally {
-            isRunning = false;
-            isPaused = false;
-            stopAudio();
+            // Only the current run tidies up; an out-of-date one would undo the run that replaced it.
+            if (run === runId) {
+                isRunning = false;
+                isPaused = false;
+                stopAudio();
+            }
         }
     }
 
@@ -1104,15 +1126,10 @@
             return;
         }
 
-        dom.btnStart.style.display = 'none';
-        dom.btnPause.style.display = '';
-        dom.btnPause.disabled = false;
-        dom.btnStop.disabled = false;
-        dom.btnSkip.disabled = false;
-
         if (resumingFrom) {
-            runWorkoutFrom(resumingFrom.exerciseIdx, resumingFrom.rep);
+            const { exerciseIdx, rep } = resumingFrom;
             resumingFrom = null;
+            runWorkout(exerciseIdx, rep);
         } else {
             // New session, sync start
             sessionState = { sessionId: null, logs: {} };
@@ -1159,7 +1176,7 @@
     }
 
     async function onStop() {
-        // Flush current exercise reps into logs BEFORE setting isRunning=false
+        // Flush current exercise reps into logs before the run ends,
         // so syncState has the latest data to send to the server
         if (isRunning && exercises.length > 0) {
             const exId = exercises[currentExerciseIdx].id;
@@ -1168,6 +1185,7 @@
             }
         }
 
+        runId++; // the loop quits at its next wait
         isRunning = false;
         isPaused = false;
         stopAudio();
@@ -1175,177 +1193,37 @@
             pauseResolve();
             pauseResolve = null;
         }
+        resetUI();
 
         // Await sync so the session is saved before we clear state
         await syncState('abandoned');
         localStorage.removeItem('Therapist_state');
         sessionState = { sessionId: null, logs: {} };
-        resetUI();
     }
 
     function onSkip() {
-        if (!isRunning || currentExerciseIdx >= exercises.length - 1) return;
+        if (!isRunning) return;
 
-        const nextIdx = currentExerciseIdx + 1;
+        // Mid-exercise, Skip moves on to the next exercise. In the rest between exercises the
+        // screen already shows the next one ("Next up"), so Skip starts that one now.
+        const resting = dom.app.getAttribute('data-phase') === 'exercise-rest';
+        const nextIdx = resting ? currentExerciseIdx : currentExerciseIdx + 1;
+        if (nextIdx >= exercises.length) return;
 
-        // Flush current reps BEFORE setting isRunning=false
-        if (exercises.length > 0 && currentRep > 0) {
-            const exId = exercises[currentExerciseIdx].id;
-            sessionState.logs[exId] = currentRep;
+        // Keep the reps done so far. (In the rest they are kept already, and currentExerciseIdx
+        // is the next exercise's.)
+        if (!resting && currentRep > 0) {
+            sessionState.logs[exercises[currentExerciseIdx].id] = currentRep;
         }
+        syncState('in_progress');
 
-        isRunning = false;
         isPaused = false;
         stopAudio();
         if (pauseResolve) { pauseResolve(); pauseResolve = null; }
+        hideMotivation();
 
-        // Small delay then restart from next exercise
-        setTimeout(() => {
-            syncState('in_progress');
-            
-            currentExerciseIdx = nextIdx;
-            currentRep = 0;
-            isRunning = true;
-            runWorkoutFrom(nextIdx, 1);
-        }, 300);
-    }
-
-    async function runWorkoutFrom(startIdx, startRep = 1) {
-        isRunning = true;
-        isPaused = false;
-
-        dom.btnStart.style.display = 'none';
-        dom.btnPause.style.display = '';
-        dom.btnPause.disabled = false;
-        dom.btnStop.disabled = false;
-        dom.btnSkip.disabled = false;
-
-        // Do not await this to prevent UI freezing on skip
-        acquireWakeLock();
-
-        try {
-            for (let exIdx = startIdx; exIdx < exercises.length; exIdx++) {
-                currentExerciseIdx = exIdx;
-                const ex = exercises[exIdx];
-                const reps = ex.reps || 20;
-                const holdSecs = ex.hold_seconds || 10;
-                const restSecs = ex.rest_seconds || 5;
-
-                checkAborted();
-                await waitIfPaused();
-                setPhase('announce');
-                dom.exerciseNum.textContent = exIdx + 1;
-                dom.exerciseName.textContent = getName(ex);
-                dom.exerciseDesc.textContent = getDesc(ex);
-                dom.repCurrent.textContent = '0';
-                dom.repTotal.textContent = reps;
-                setCountdown('');
-                setRingProgress(0);
-                setExerciseImage(ex.order || (exIdx + 1));
-                updateOverallProgress();
-
-                await speak(t('announce')(exIdx + 1, getName(ex), getDesc(ex)));
-                checkAborted();
-                await waitIfPaused();
-                
-                // If resuming mid-exercise, we skip the 800ms delay and jump into the rep loop
-                if (startRep === 1) {
-                    await delay(800);
-                }
-
-                for (let rep = startRep; rep <= reps; rep++) {
-                    currentRep = rep;
-                    saveLocalState();
-                    checkAborted();
-                    await waitIfPaused();
-
-                    let repAnnouncement = `${t('rep')} ${rep}`;
-                    let motivationalPhrase = null;
-                    if (rep > 1 && rep % 4 === 0) {
-                        motivationalPhrase = getMotivationalPhrase(rep);
-                        showMotivation(motivationalPhrase);
-                    } else if (rep === 1) {
-                        hideMotivation();
-                    }
-
-                    setPhase('announce');
-                    dom.repCurrent.textContent = rep;
-                    updateOverallProgress();
-                    if (motivationalPhrase) {
-                        await speak(motivationalPhrase);
-                        checkAborted();
-                        await waitIfPaused();
-                    }
-                    await speak(repAnnouncement);
-                    checkAborted();
-                    await waitIfPaused();
-
-                    setPhase('hold');
-                    await speak(t('hold'));
-                    checkAborted();
-
-                    for (let sec = 1; sec <= holdSecs; sec++) {
-                        await waitIfPaused();
-                        checkAborted();
-                        setCountdown(sec);
-                        setRingProgress(sec / holdSecs);
-                        await speak(String(sec));
-                        checkAborted();
-                    }
-
-                    await waitIfPaused();
-                    checkAborted();
-                    setPhase('rest');
-
-                    if (rep < reps) {
-                        await speak(t('relax'));
-                        checkAborted();
-                        await visualCountdown(restSecs);
-                    } else {
-                        await speak(t('exerciseDone'));
-                        checkAborted();
-                    }
-
-                    hideMotivation();
-                }
-
-                // Reset startRep to 1 so that the NEXT exercise in the loop starts from the beginning
-                startRep = 1;
-
-                if (exIdx < exercises.length - 1) {
-                    checkAborted();
-                    await waitIfPaused();
-                    setPhase('exercise-rest');
-
-                    // Show next exercise details during rest
-                    currentExerciseIdx = exIdx + 1;
-                    updateUIForLanguage();
-
-                    const nextEx = exercises[currentExerciseIdx];
-                    await speak(t('restNext')(getName(nextEx)));
-                    checkAborted();
-                    
-                    syncState('in_progress');
-                    
-                    await visualCountdown(EXERCISE_REST_SECONDS);
-                    checkAborted();
-                }
-            }
-
-            onWorkoutComplete();
-
-        } catch (err) {
-            if (err.message === 'WORKOUT_STOPPED') {
-                console.log('[PhysioCoach] Workout stopped by user');
-                resetUI();
-            } else {
-                console.error('[PhysioCoach] Error:', err);
-            }
-        } finally {
-            isRunning = false;
-            isPaused = false;
-            stopAudio();
-        }
+        // The new run takes over at once; the old loop quits at its next wait.
+        runWorkout(nextIdx, 1);
     }
 
 
